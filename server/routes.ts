@@ -6,10 +6,8 @@ import { api } from "@shared/routes";
 import { type InsertMarket } from "@shared/schema";
 
 // Helper to fetch Polymarket data
-async function fetchPolymarket(): Promise<InsertMarket[]> {
+export async function fetchPolymarket(): Promise<InsertMarket[]> {
   try {
-    // Using Gamma API to get high volume markets
-    // Note: Polymarket Gamma API often returns an array of markets directly.
     const response = await fetch("https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100");
     if (!response.ok) {
       console.error(`Polymarket API error: ${response.status} ${response.statusText}`);
@@ -42,26 +40,38 @@ async function fetchPolymarket(): Promise<InsertMarket[]> {
 }
 
 // Helper to fetch Kalshi data
-async function fetchKalshi(): Promise<InsertMarket[]> {
+export async function fetchKalshi(): Promise<InsertMarket[]> {
   try {
-    const response = await fetch("https://api.elections.kalshi.com/trade-api/v2/markets?limit=50&status=open");
+    // Kalshi's V2 public market list
+    // Use the elections subdomain as it's often more up-to-date for general markets as well
+    const response = await fetch("https://api.elections.kalshi.com/trade-api/v2/markets?limit=100&status=open");
     if (!response.ok) {
       console.error(`Kalshi API error: ${response.status} ${response.statusText}`);
       return [];
     }
     const data = await response.json();
     
-    return (data.markets || []).map((m: any): InsertMarket => ({
-      externalId: m.ticker,
-      platform: 'kalshi',
-      question: m.title,
-      url: `https://kalshi.com/markets/${m.ticker}`,
-      totalVolume: (m.volume || 0).toString(),
-      volume24h: (m.recent_volume || 0).toString(),
-      startDate: m.open_date ? new Date(m.open_date) : null,
-      endDate: m.close_date ? new Date(m.close_date) : null,
-      resolutionRules: m.rules_primary || "",
-    }));
+    const markets = data.markets || [];
+    console.log(`Kalshi raw count: ${markets.length}`);
+
+    return markets.map((m: any): InsertMarket => {
+      // Kalshi volume is in contract units.
+      // We will treat it as a volume indicator.
+      const vol = m.volume || 0;
+      const recentVol = m.recent_volume || 0;
+      
+      return {
+        externalId: m.ticker,
+        platform: 'kalshi',
+        question: m.title || m.ticker,
+        url: `https://kalshi.com/markets/${m.ticker}`,
+        totalVolume: vol.toString(),
+        volume24h: recentVol.toString(),
+        startDate: m.open_date ? new Date(m.open_date) : null,
+        endDate: m.close_date ? new Date(m.close_date) : null,
+        resolutionRules: m.rules_primary || m.subtitle || "",
+      };
+    });
   } catch (error) {
     console.error("Error fetching Kalshi:", error);
     return [];
@@ -70,19 +80,23 @@ async function fetchKalshi(): Promise<InsertMarket[]> {
 
 async function refreshAllMarkets() {
   console.log("Starting market refresh...");
-  const [poly, kalshi] = await Promise.all([
-    fetchPolymarket(),
-    fetchKalshi()
-  ]);
-  
-  console.log(`Fetched from Poly: ${poly.length}, Kalshi: ${kalshi.length}`);
-  const allMarkets = [...poly, ...kalshi];
-  
-  if (allMarkets.length > 0) {
-    await storage.upsertMarkets(allMarkets);
-    console.log(`Successfully upserted ${allMarkets.length} total markets`);
-  } else {
-    console.warn("No markets fetched from any source");
+  try {
+    const [poly, kalshi] = await Promise.all([
+      fetchPolymarket().catch(e => { console.error("Poly fetch failed", e); return []; }),
+      fetchKalshi().catch(e => { console.error("Kalshi fetch failed", e); return []; })
+    ]);
+    
+    console.log(`Fetched from Poly: ${poly.length}, Kalshi: ${kalshi.length}`);
+    const allMarkets = [...poly, ...kalshi];
+    
+    if (allMarkets.length > 0) {
+      await storage.upsertMarkets(allMarkets);
+      console.log(`Successfully upserted ${allMarkets.length} total markets`);
+    } else {
+      console.warn("No markets fetched from any source");
+    }
+  } catch (error) {
+    console.error("Global refresh error:", error);
   }
 }
 
@@ -91,21 +105,26 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  // Initial fetch on startup
   refreshAllMarkets().catch(console.error);
-
-  // Poll every minute
   setInterval(() => refreshAllMarkets().catch(console.error), 60 * 1000);
 
   app.get(api.markets.list.path, async (req, res) => {
-    const markets = await storage.getMarkets();
-    res.json(markets);
+    try {
+      const markets = await storage.getMarkets();
+      res.json(markets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch markets" });
+    }
   });
 
   app.post("/api/markets/refresh", async (req, res) => {
-    await refreshAllMarkets();
-    const markets = await storage.getMarkets();
-    res.json(markets);
+    try {
+      await refreshAllMarkets();
+      const markets = await storage.getMarkets();
+      res.json(markets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to refresh markets" });
+    }
   });
 
   return httpServer;
