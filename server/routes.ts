@@ -8,21 +8,33 @@ import { type InsertMarket } from "@shared/schema";
 // Helper to fetch Polymarket data
 async function fetchPolymarket(): Promise<InsertMarket[]> {
   try {
-    const response = await fetch("https://gamma-api.polymarket.com/markets?limit=50&sort=volume&order=desc");
-    if (!response.ok) return [];
+    // Using Gamma API to get high volume markets
+    // Note: Polymarket Gamma API often returns an array of markets directly.
+    const response = await fetch("https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100");
+    if (!response.ok) {
+      console.error(`Polymarket API error: ${response.status} ${response.statusText}`);
+      return [];
+    }
     const data = await response.json();
     
-    return data.map((m: any): InsertMarket => ({
-      externalId: m.id,
-      platform: 'polymarket',
-      question: m.question,
-      url: `https://polymarket.com/event/${m.slug}`,
-      totalVolume: m.volume?.toString() || "0",
-      volume24h: m.volume_24h?.toString() || "0",
-      startDate: m.startDate ? new Date(m.startDate) : null,
-      endDate: m.endDate ? new Date(m.endDate) : null,
-      resolutionRules: m.description || "",
-    }));
+    if (!Array.isArray(data)) {
+      console.error("Polymarket API returned unexpected format (not an array)");
+      return [];
+    }
+
+    return data
+      .filter((m: any) => m.active && !m.closed)
+      .map((m: any): InsertMarket => ({
+        externalId: m.id || m.ticker || Math.random().toString(),
+        platform: 'polymarket',
+        question: m.question || m.title || "Untitled Market",
+        url: m.slug ? `https://polymarket.com/event/${m.slug}` : "https://polymarket.com",
+        totalVolume: (m.volume || 0).toString(),
+        volume24h: (m.volume24h || m.volume_24h || 0).toString(),
+        startDate: m.startDate ? new Date(m.startDate) : null,
+        endDate: m.endDate ? new Date(m.endDate) : null,
+        resolutionRules: m.description || "",
+      }));
   } catch (error) {
     console.error("Error fetching Polymarket:", error);
     return [];
@@ -32,9 +44,11 @@ async function fetchPolymarket(): Promise<InsertMarket[]> {
 // Helper to fetch Kalshi data
 async function fetchKalshi(): Promise<InsertMarket[]> {
   try {
-    // Fetching public markets
     const response = await fetch("https://api.elections.kalshi.com/trade-api/v2/markets?limit=50&status=open");
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.error(`Kalshi API error: ${response.status} ${response.statusText}`);
+      return [];
+    }
     const data = await response.json();
     
     return (data.markets || []).map((m: any): InsertMarket => ({
@@ -42,8 +56,8 @@ async function fetchKalshi(): Promise<InsertMarket[]> {
       platform: 'kalshi',
       question: m.title,
       url: `https://kalshi.com/markets/${m.ticker}`,
-      totalVolume: (m.volume || 0).toString(), // Kalshi volume is usually contracts, not USD directly in some endpoints, but we'll use it as is for MVP
-      volume24h: (m.recent_volume || 0).toString(), // This might need adjustment based on actual API response structure
+      totalVolume: (m.volume || 0).toString(),
+      volume24h: (m.recent_volume || 0).toString(),
       startDate: m.open_date ? new Date(m.open_date) : null,
       endDate: m.close_date ? new Date(m.close_date) : null,
       resolutionRules: m.rules_primary || "",
@@ -54,23 +68,22 @@ async function fetchKalshi(): Promise<InsertMarket[]> {
   }
 }
 
-// Mock/Stub for Limitless (since API might need complex auth or specific headers)
-async function fetchLimitless(): Promise<InsertMarket[]> {
-    // In a real scenario, we would hit the API. 
-    // For MVP/Demo purposes if we can't easily access it without a wallet signature:
-    return [];
-}
-
 async function refreshAllMarkets() {
-  const [poly, kalshi, limitless] = await Promise.all([
+  console.log("Starting market refresh...");
+  const [poly, kalshi] = await Promise.all([
     fetchPolymarket(),
-    fetchKalshi(),
-    fetchLimitless()
+    fetchKalshi()
   ]);
   
-  const allMarkets = [...poly, ...kalshi, ...limitless];
-  console.log(`Fetched ${allMarkets.length} markets`);
-  await storage.upsertMarkets(allMarkets);
+  console.log(`Fetched from Poly: ${poly.length}, Kalshi: ${kalshi.length}`);
+  const allMarkets = [...poly, ...kalshi];
+  
+  if (allMarkets.length > 0) {
+    await storage.upsertMarkets(allMarkets);
+    console.log(`Successfully upserted ${allMarkets.length} total markets`);
+  } else {
+    console.warn("No markets fetched from any source");
+  }
 }
 
 export async function registerRoutes(
