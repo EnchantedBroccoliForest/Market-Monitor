@@ -16,7 +16,7 @@ import {
   CalendarDays
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 export default function Home() {
   const { data: markets = [], isLoading, isRefetching, refetch } = useMarkets();
@@ -138,6 +138,7 @@ export default function Home() {
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">Total Vol</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right hidden md:table-cell">24h Vol</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right hidden lg:table-cell">Start Date</th>
+                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right hidden lg:table-cell">Live Time</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right hidden lg:table-cell">End Date</th>
                   <th className="p-4 w-10"></th>
                 </tr>
@@ -153,13 +154,14 @@ export default function Home() {
                       <td className="p-4"><div className="h-4 w-24 bg-white/5 rounded ml-auto" /></td>
                       <td className="p-4 hidden md:table-cell"><div className="h-4 w-20 bg-white/5 rounded ml-auto" /></td>
                       <td className="p-4 hidden lg:table-cell"><div className="h-4 w-24 bg-white/5 rounded ml-auto" /></td>
+                      <td className="p-4 hidden lg:table-cell"><div className="h-4 w-20 bg-white/5 rounded ml-auto" /></td>
                       <td className="p-4 hidden lg:table-cell"><div className="h-4 w-24 bg-white/5 rounded ml-auto" /></td>
                       <td className="p-4"></td>
                     </tr>
                   ))
                 ) : filteredMarkets.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-12 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-12 text-center text-muted-foreground">
                       No markets found matching your search.
                     </td>
                   </tr>
@@ -198,6 +200,9 @@ export default function Home() {
                         </td>
                         <td className="p-4 text-right text-sm text-muted-foreground hidden lg:table-cell">
                           {market.startDate ? format(new Date(market.startDate), "MMM d, yyyy") : "-"}
+                        </td>
+                        <td className="p-4 text-right text-sm text-muted-foreground hidden lg:table-cell">
+                          {market.startDate ? formatDistanceToNow(new Date(market.startDate), { addSuffix: false }) : "-"}
                         </td>
                         <td className="p-4 text-right text-sm text-muted-foreground hidden lg:table-cell">
                           {market.endDate ? format(new Date(market.endDate), "MMM d, yyyy") : "-"}
