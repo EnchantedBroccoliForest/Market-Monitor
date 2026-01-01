@@ -29,7 +29,7 @@ export async function fetchPolymarket(): Promise<InsertMarket[]> {
         question: m.question || m.title || "Untitled Market",
         url: m.slug ? `https://polymarket.com/event/${m.slug}` : "https://polymarket.com",
         totalVolume: (m.volume || 0).toString(),
-        volume24h: (m.volume24h || m.volume_24h || 0).toString(),
+        volume24h: (m.volume24hr || m.volume_24h || m['24hr_volume'] || 0).toString(),
         startDate: m.startDate ? new Date(m.startDate) : null,
         endDate: m.endDate ? new Date(m.endDate) : null,
         resolutionRules: m.description || "",
@@ -58,8 +58,10 @@ export async function fetchKalshi(): Promise<InsertMarket[]> {
     return markets.map((m: any): InsertMarket => {
       // Kalshi volume is in contract units.
       // We will treat it as a volume indicator.
+      // V2 markets endpoint uses volume and recent_volume.
+      // If recent_volume is 0, let's check if there's any other field like 'last_24h_volume'
       const vol = m.volume || 0;
-      const recentVol = m.recent_volume || 0;
+      const recentVol = m.recent_volume || m.last_24h_volume || m.volume_24h || 0;
       
       return {
         externalId: m.ticker,
