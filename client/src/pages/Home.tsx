@@ -192,7 +192,7 @@ export default function Home() {
                           {formatCurrency(market.totalVolume)}
                         </td>
                         <td className="p-4 text-right font-mono text-muted-foreground hidden md:table-cell">
-                          {formatCurrency(market.volume24h)}
+                          {formatCurrency(Number(market.volume24h))}
                         </td>
                         <td className="p-4 text-right text-sm text-muted-foreground hidden lg:table-cell">
                           {market.endDate ? format(new Date(market.endDate), "MMM d, yyyy") : "-"}
