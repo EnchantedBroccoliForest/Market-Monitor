@@ -1,7 +1,7 @@
 
 import { db } from "./db";
 import { markets, type InsertMarket, type Market } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getMarkets(): Promise<Market[]>;
@@ -14,24 +14,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertMarkets(marketsList: InsertMarket[]): Promise<void> {
-    for (const market of marketsList) {
-      // Very basic upsert logic for now to keep it simple
-      const existing = await db.select().from(markets).where(eq(markets.externalId, market.externalId));
-      if (existing.length > 0) {
-        await db.update(markets)
-          .set({
-            totalVolume: market.totalVolume,
-            volume24h: market.volume24h,
-            lastUpdated: new Date(),
-            // Update other fields if dynamic
-            question: market.question, 
-            endDate: market.endDate
-          })
-          .where(eq(markets.id, existing[0].id));
-      } else {
-        await db.insert(markets).values(market);
-      }
-    }
+    if (marketsList.length === 0) return;
+
+    await db.insert(markets)
+      .values(marketsList)
+      .onConflictDoUpdate({
+        target: markets.externalId,
+        set: {
+          totalVolume: sql`EXCLUDED.total_volume`,
+          volume24h: sql`EXCLUDED.volume_24h`,
+          lastUpdated: new Date(),
+          question: sql`EXCLUDED.question`,
+          endDate: sql`EXCLUDED.end_date`
+        }
+      });
   }
 }
 
