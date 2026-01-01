@@ -5,7 +5,7 @@ import { z } from "zod";
 
 export const markets = pgTable("markets", {
   id: serial("id").primaryKey(),
-  externalId: text("external_id").notNull(),
+  externalId: text("external_id").notNull().unique(),
   platform: text("platform").notNull(), // 'polymarket', 'kalshi', 'limitless', 'opinion', 'myriad'
   question: text("question").notNull(),
   url: text("url").notNull(),
