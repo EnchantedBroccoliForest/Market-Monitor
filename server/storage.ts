@@ -6,6 +6,7 @@ import { eq, desc, sql } from "drizzle-orm";
 export interface IStorage {
   getMarkets(): Promise<Market[]>;
   upsertMarkets(marketsList: InsertMarket[]): Promise<void>;
+  deleteOldMarkets(days: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -28,6 +29,12 @@ export class DatabaseStorage implements IStorage {
           endDate: sql`EXCLUDED.end_date`
         }
       });
+  }
+
+  async deleteOldMarkets(days: number): Promise<void> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    await db.delete(markets).where(sql`${markets.lastUpdated} < ${cutoff}`);
   }
 }
 

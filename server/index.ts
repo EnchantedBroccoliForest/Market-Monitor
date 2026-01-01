@@ -62,6 +62,23 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  const gracefulShutdown = () => {
+    log("Graceful shutdown initiated...");
+    httpServer.close(() => {
+      log("HTTP server closed.");
+      process.exit(0);
+    });
+
+    // Force close after 10s
+    setTimeout(() => {
+      log("Forcing shutdown...");
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on("SIGTERM", gracefulShutdown);
+  process.on("SIGINT", gracefulShutdown);
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
