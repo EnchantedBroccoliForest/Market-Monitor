@@ -4,11 +4,12 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { type InsertMarket } from "@shared/schema";
+import { REFRESH_INTERVAL_MS, POLYMARKET_API_LIMIT, KALSHI_API_LIMIT } from "./constants";
 
 // Helper to fetch Polymarket data
 export async function fetchPolymarket(): Promise<InsertMarket[]> {
   try {
-    const response = await fetch("https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100");
+    const response = await fetch(`https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${POLYMARKET_API_LIMIT}`);
     if (!response.ok) {
       console.error(`Polymarket API error: ${response.status} ${response.statusText}`);
       return [];
@@ -44,7 +45,7 @@ export async function fetchKalshi(): Promise<InsertMarket[]> {
   try {
     // Kalshi's V2 public market list
     // Use the elections subdomain as it's often more up-to-date for general markets as well
-    const response = await fetch("https://api.elections.kalshi.com/trade-api/v2/markets?limit=100&status=open");
+    const response = await fetch(`https://api.elections.kalshi.com/trade-api/v2/markets?limit=${KALSHI_API_LIMIT}&status=open`);
     if (!response.ok) {
       console.error(`Kalshi API error: ${response.status} ${response.statusText}`);
       return [];
@@ -105,8 +106,12 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   refreshAllMarkets().catch(console.error);
-  setInterval(() => refreshAllMarkets().catch(console.error), 60 * 1000);
+  setInterval(() => refreshAllMarkets().catch(console.error), REFRESH_INTERVAL_MS);
 
   app.get(api.markets.list.path, async (req, res) => {
     try {
