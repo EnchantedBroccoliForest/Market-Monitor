@@ -1,7 +1,7 @@
 
 import { db } from "./db";
 import { markets, type InsertMarket, type Market } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, or, isNull, gte } from "drizzle-orm";
 
 export interface IStorage {
   getMarkets(): Promise<Market[]>;
@@ -12,7 +12,13 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getMarkets(): Promise<Market[]> {
-    return await db.select().from(markets).orderBy(desc(markets.totalVolume));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return await db.select()
+      .from(markets)
+      .where(or(isNull(markets.endDate), gte(markets.endDate, today)))
+      .orderBy(desc(markets.totalVolume));
   }
 
   async upsertMarkets(marketsList: InsertMarket[]): Promise<void> {
