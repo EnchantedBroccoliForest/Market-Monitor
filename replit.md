@@ -43,6 +43,11 @@ Preferred communication style: Simple, everyday language.
 - Kalshi: Fetches from `api.elections.kalshi.com/trade-api/v2/markets` with open status filter
 - Both APIs use configurable limits defined in `server/constants.ts`
 
+### Data Maintenance
+- **Stale Market Cleanup**: Markets not seen in API responses for 24 hours are automatically removed from the database
+- **Cleanup Threshold**: Configurable via `STALE_MARKET_THRESHOLD_MINUTES` in `server/constants.ts`
+- **Safety**: The 24-hour threshold is intentionally long to tolerate temporary API hiccups or outages
+
 ## External Dependencies
 
 ### Database

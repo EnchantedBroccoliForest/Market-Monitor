@@ -4,7 +4,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { type InsertMarket } from "@shared/schema";
-import { REFRESH_INTERVAL_MS, POLYMARKET_API_LIMIT, KALSHI_API_LIMIT } from "./constants";
+import { REFRESH_INTERVAL_MS, POLYMARKET_API_LIMIT, KALSHI_API_LIMIT, STALE_MARKET_THRESHOLD_MINUTES } from "./constants";
 
 // Helper to fetch Polymarket data
 export async function fetchPolymarket(): Promise<InsertMarket[]> {
@@ -95,6 +95,12 @@ async function refreshAllMarkets() {
     if (allMarkets.length > 0) {
       await storage.upsertMarkets(allMarkets);
       console.log(`Successfully upserted ${allMarkets.length} total markets`);
+      
+      // Clean up stale markets that haven't been seen in recent refreshes
+      const removedCount = await storage.deleteStaleMarkets(STALE_MARKET_THRESHOLD_MINUTES);
+      if (removedCount > 0) {
+        console.log(`Removed ${removedCount} stale markets not seen in the last ${STALE_MARKET_THRESHOLD_MINUTES} minutes`);
+      }
     } else {
       console.warn("No markets fetched from any source");
     }
