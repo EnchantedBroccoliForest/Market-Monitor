@@ -136,8 +136,8 @@ export default function Home() {
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-32">Platform</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Market Question</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">Total Vol</th>
-                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right hidden md:table-cell">24h Vol</th>
-                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right hidden lg:table-cell">End Date</th>
+                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">24h Vol</th>
+                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">End Date</th>
                   <th className="p-4 w-10"></th>
                 </tr>
               </thead>
@@ -150,8 +150,8 @@ export default function Home() {
                       <td className="p-4"><div className="h-6 w-20 bg-white/5 rounded" /></td>
                       <td className="p-4"><div className="h-4 w-64 bg-white/5 rounded" /></td>
                       <td className="p-4"><div className="h-4 w-24 bg-white/5 rounded ml-auto" /></td>
-                      <td className="p-4 hidden md:table-cell"><div className="h-4 w-20 bg-white/5 rounded ml-auto" /></td>
-                      <td className="p-4 hidden lg:table-cell"><div className="h-4 w-24 bg-white/5 rounded ml-auto" /></td>
+                      <td className="p-4"><div className="h-4 w-20 bg-white/5 rounded ml-auto" /></td>
+                      <td className="p-4"><div className="h-4 w-24 bg-white/5 rounded ml-auto" /></td>
                       <td className="p-4"></td>
                     </tr>
                   ))
@@ -191,10 +191,10 @@ export default function Home() {
                         <td className="p-4 text-right font-mono font-medium">
                           {formatCurrency(market.totalVolume)}
                         </td>
-                        <td className="p-4 text-right font-mono text-muted-foreground hidden md:table-cell">
+                        <td className="p-4 text-right font-mono text-muted-foreground">
                           {formatCurrency(Number(market.volume24h))}
                         </td>
-                        <td className="p-4 text-right text-sm text-muted-foreground hidden lg:table-cell">
+                        <td className="p-4 text-right text-sm text-muted-foreground">
                           {market.endDate ? format(new Date(market.endDate), "MMM d, yyyy") : "-"}
                         </td>
                         <td className="p-4 text-right">
