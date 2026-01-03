@@ -6,6 +6,24 @@ import { api } from "@shared/routes";
 import { type InsertMarket } from "@shared/schema";
 import { REFRESH_INTERVAL_MS, POLYMARKET_API_LIMIT, KALSHI_API_LIMIT, STALE_MARKET_THRESHOLD_MINUTES } from "./constants";
 
+// Helper to safely parse numeric values (preserves negatives for potential delta values)
+function safeParseNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+  return isNaN(num) || !isFinite(num) ? 0 : num;
+}
+
+// Helper to safely parse dates
+function safeParseDate(value: any): Date | null {
+  if (!value) return null;
+  try {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
 // Helper to fetch Polymarket data
 export async function fetchPolymarket(): Promise<InsertMarket[]> {
   try {
@@ -23,16 +41,17 @@ export async function fetchPolymarket(): Promise<InsertMarket[]> {
 
     return data
       .filter((m: any) => m.active && !m.closed)
+      .filter((m: any) => m.id || m.ticker)
       .map((m: any): InsertMarket => ({
-        externalId: m.id || m.ticker || Math.random().toString(),
+        externalId: m.id || m.ticker,
         platform: 'polymarket',
-        question: m.question || m.title || "Untitled Market",
+        question: (m.question || m.title || "Untitled Market").trim().slice(0, 500),
         url: m.slug ? `https://polymarket.com/event/${m.slug}` : "https://polymarket.com",
-        totalVolume: (m.volume || 0).toString(),
-        volume24h: (m.volume24hr || m.volume_24h || m['24hr_volume'] || 0).toString(),
-        startDate: m.startDate ? new Date(m.startDate) : null,
-        endDate: m.endDate ? new Date(m.endDate) : null,
-        resolutionRules: m.description || "",
+        totalVolume: safeParseNumber(m.volume).toString(),
+        volume24h: safeParseNumber(m.volume24hr || m.volume_24h || m['24hr_volume']).toString(),
+        startDate: safeParseDate(m.startDate),
+        endDate: safeParseDate(m.endDate),
+        resolutionRules: (m.description || "").slice(0, 2000),
       }));
   } catch (error) {
     console.error("Error fetching Polymarket:", error);
@@ -43,8 +62,6 @@ export async function fetchPolymarket(): Promise<InsertMarket[]> {
 // Helper to fetch Kalshi data
 export async function fetchKalshi(): Promise<InsertMarket[]> {
   try {
-    // Kalshi's V2 public market list
-    // Use the elections subdomain as it's often more up-to-date for general markets as well
     const response = await fetch(`https://api.elections.kalshi.com/trade-api/v2/markets?limit=${KALSHI_API_LIMIT}&status=open`);
     if (!response.ok) {
       console.error(`Kalshi API error: ${response.status} ${response.statusText}`);
@@ -55,26 +72,24 @@ export async function fetchKalshi(): Promise<InsertMarket[]> {
     const markets = data.markets || [];
     console.log(`Kalshi raw count: ${markets.length}`);
 
-    return markets.map((m: any): InsertMarket => {
-      // Kalshi volume is in contract units.
-      // We will treat it as a volume indicator.
-      // V2 markets endpoint uses volume and recent_volume.
-      // If recent_volume is 0, let's check if there's any other field like 'last_24h_volume'
-      const vol = m.volume || 0;
-      const recentVol = m.recent_volume || m.last_24h_volume || m.volume_24h || 0;
-      
-      return {
-        externalId: m.ticker,
-        platform: 'kalshi',
-        question: m.title || m.ticker,
-        url: `https://kalshi.com/markets/${m.ticker}`,
-        totalVolume: vol.toString(),
-        volume24h: recentVol.toString(),
-        startDate: m.open_date ? new Date(m.open_date) : null,
-        endDate: m.close_date ? new Date(m.close_date) : null,
-        resolutionRules: m.rules_primary || m.subtitle || "",
-      };
-    });
+    return markets
+      .filter((m: any) => m.ticker)
+      .map((m: any): InsertMarket => {
+        const vol = safeParseNumber(m.volume);
+        const recentVol = safeParseNumber(m.recent_volume || m.last_24h_volume || m.volume_24h);
+        
+        return {
+          externalId: m.ticker,
+          platform: 'kalshi',
+          question: (m.title || m.ticker || "Untitled Market").trim().slice(0, 500),
+          url: `https://kalshi.com/markets/${m.ticker}`,
+          totalVolume: vol.toString(),
+          volume24h: recentVol.toString(),
+          startDate: safeParseDate(m.open_date),
+          endDate: safeParseDate(m.close_date),
+          resolutionRules: (m.rules_primary || m.subtitle || "").slice(0, 2000),
+        };
+      });
   } catch (error) {
     console.error("Error fetching Kalshi:", error);
     return [];
