@@ -51,9 +51,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Features
 - **Column Sorting**: Clickable headers for Total Vol, 24h Vol, and End Date columns
-  - Click once for descending sort, click again for ascending
+  - Descending only (largest values first)
   - Markets with no end date appear at bottom when sorting by End Date
-  - Sort indicators (arrows) show current sort column and direction
+  - Arrow icon shows which column is currently active
 - **Search**: Real-time filtering by market question text
 - **Data Quality**: Safe parsing for numeric and date values from external APIs
 

@@ -14,63 +14,47 @@ import {
   RefreshCw,
   ExternalLink,
   CalendarDays,
-  ArrowUpDown,
-  ArrowUp,
   ArrowDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 
 type SortColumn = "totalVolume" | "volume24h" | "endDate";
-type SortDirection = "asc" | "desc";
 
 export default function Home() {
   const { data: markets = [], isLoading, isRefetching, refetch } = useMarkets();
   const [search, setSearch] = useState("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("totalVolume");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   // Derived Statistics
   const totalVolume = markets.reduce((acc, m) => acc + parseFloat(m.totalVolume || "0"), 0);
   const volume24h = markets.reduce((acc, m) => acc + parseFloat(m.volume24h || "0"), 0);
   const activeMarkets = markets.length;
 
-  // Handle column sort click
+  // Handle column sort click - always descending (largest first)
   const handleSort = (column: SortColumn) => {
-    if (sortColumn === column) {
-      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
-    } else {
-      setSortColumn(column);
-      setSortDirection("desc");
-    }
+    setSortColumn(column);
   };
 
   // Get sort icon for column
   const getSortIcon = (column: SortColumn) => {
     if (sortColumn !== column) {
-      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />;
+      return <ArrowDown className="w-3 h-3 ml-1 opacity-30" />;
     }
-    return sortDirection === "asc" 
-      ? <ArrowUp className="w-3 h-3 ml-1" />
-      : <ArrowDown className="w-3 h-3 ml-1" />;
+    return <ArrowDown className="w-3 h-3 ml-1" />;
   };
 
-  // Filter & Sort
+  // Filter & Sort (always descending - largest values first)
   const filteredMarkets = useMemo(() => {
     const filtered = markets.filter(m => 
       m.question.toLowerCase().includes(search.toLowerCase())
     );
     
     return [...filtered].sort((a, b) => {
-      let aVal: number;
-      let bVal: number;
-
       if (sortColumn === "totalVolume") {
-        aVal = parseFloat(a.totalVolume || "0");
-        bVal = parseFloat(b.totalVolume || "0");
+        return parseFloat(b.totalVolume || "0") - parseFloat(a.totalVolume || "0");
       } else if (sortColumn === "volume24h") {
-        aVal = parseFloat(a.volume24h || "0");
-        bVal = parseFloat(b.volume24h || "0");
+        return parseFloat(b.volume24h || "0") - parseFloat(a.volume24h || "0");
       } else {
         const aDate = a.endDate ? new Date(a.endDate).getTime() : null;
         const bDate = b.endDate ? new Date(b.endDate).getTime() : null;
@@ -79,12 +63,10 @@ export default function Home() {
         if (aDate === null) return 1;
         if (bDate === null) return -1;
         
-        return sortDirection === "asc" ? aDate - bDate : bDate - aDate;
+        return bDate - aDate;
       }
-
-      return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
     });
-  }, [markets, search, sortColumn, sortDirection]);
+  }, [markets, search, sortColumn]);
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
