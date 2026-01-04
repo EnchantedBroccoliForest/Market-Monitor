@@ -47,6 +47,15 @@ Preferred communication style: Simple, everyday language.
 - **Stale Market Cleanup**: Markets not seen in API responses for 24 hours are automatically removed from the database
 - **Cleanup Threshold**: Configurable via `STALE_MARKET_THRESHOLD_MINUTES` in `server/constants.ts`
 - **Safety**: The 24-hour threshold is intentionally long to tolerate temporary API hiccups or outages
+- **Expired Market Filtering**: Markets with end dates in the past are filtered out at query time
+
+### Frontend Features
+- **Column Sorting**: Clickable headers for Total Vol, 24h Vol, and End Date columns
+  - Descending only (largest values first)
+  - Markets with no end date appear at bottom when sorting by End Date
+  - Arrow icon shows which column is currently active
+- **Search**: Real-time filtering by market question text
+- **Data Quality**: Safe parsing for numeric and date values from external APIs
 
 ## External Dependencies
 

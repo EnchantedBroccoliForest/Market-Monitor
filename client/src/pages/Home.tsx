@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMarkets, formatCurrency } from "@/hooks/use-markets";
 import { StatsCard } from "@/components/StatsCard";
 import { VolumeChart } from "@/components/VolumeChart";
@@ -13,24 +13,60 @@ import {
   Search, 
   RefreshCw,
   ExternalLink,
-  CalendarDays
+  CalendarDays,
+  ArrowDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 
+type SortColumn = "totalVolume" | "volume24h" | "endDate";
+
 export default function Home() {
   const { data: markets = [], isLoading, isRefetching, refetch } = useMarkets();
   const [search, setSearch] = useState("");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("totalVolume");
 
   // Derived Statistics
   const totalVolume = markets.reduce((acc, m) => acc + parseFloat(m.totalVolume || "0"), 0);
   const volume24h = markets.reduce((acc, m) => acc + parseFloat(m.volume24h || "0"), 0);
   const activeMarkets = markets.length;
 
-  // Filter & Sort
-  const filteredMarkets = markets
-    .filter(m => m.question.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => parseFloat(b.totalVolume || "0") - parseFloat(a.totalVolume || "0"));
+  // Handle column sort click - always descending (largest first)
+  const handleSort = (column: SortColumn) => {
+    setSortColumn(column);
+  };
+
+  // Get sort icon for column
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowDown className="w-3 h-3 ml-1 opacity-30" />;
+    }
+    return <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
+  // Filter & Sort (always descending - largest values first)
+  const filteredMarkets = useMemo(() => {
+    const filtered = markets.filter(m => 
+      m.question.toLowerCase().includes(search.toLowerCase())
+    );
+    
+    return [...filtered].sort((a, b) => {
+      if (sortColumn === "totalVolume") {
+        return parseFloat(b.totalVolume || "0") - parseFloat(a.totalVolume || "0");
+      } else if (sortColumn === "volume24h") {
+        return parseFloat(b.volume24h || "0") - parseFloat(a.volume24h || "0");
+      } else {
+        const aDate = a.endDate ? new Date(a.endDate).getTime() : null;
+        const bDate = b.endDate ? new Date(b.endDate).getTime() : null;
+        
+        if (aDate === null && bDate === null) return 0;
+        if (aDate === null) return 1;
+        if (bDate === null) return -1;
+        
+        return bDate - aDate;
+      }
+    });
+  }, [markets, search, sortColumn]);
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -135,9 +171,36 @@ export default function Home() {
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-16 text-center">#</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-32">Platform</th>
                   <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Market Question</th>
-                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">Total Vol</th>
-                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">24h Vol</th>
-                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">End Date</th>
+                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">
+                    <button 
+                      onClick={() => handleSort("totalVolume")}
+                      className="inline-flex items-center hover:text-foreground transition-colors cursor-pointer"
+                      data-testid="sort-total-volume"
+                    >
+                      Total Vol
+                      {getSortIcon("totalVolume")}
+                    </button>
+                  </th>
+                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">
+                    <button 
+                      onClick={() => handleSort("volume24h")}
+                      className="inline-flex items-center hover:text-foreground transition-colors cursor-pointer"
+                      data-testid="sort-24h-volume"
+                    >
+                      24h Vol
+                      {getSortIcon("volume24h")}
+                    </button>
+                  </th>
+                  <th className="p-4 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">
+                    <button 
+                      onClick={() => handleSort("endDate")}
+                      className="inline-flex items-center hover:text-foreground transition-colors cursor-pointer"
+                      data-testid="sort-end-date"
+                    >
+                      End Date
+                      {getSortIcon("endDate")}
+                    </button>
+                  </th>
                   <th className="p-4 w-10"></th>
                 </tr>
               </thead>
