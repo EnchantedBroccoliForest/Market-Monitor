@@ -4,7 +4,16 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { type InsertMarket } from "@shared/schema";
-import { REFRESH_INTERVAL_MS, POLYMARKET_API_LIMIT, KALSHI_API_LIMIT, STALE_MARKET_THRESHOLD_MINUTES } from "./constants";
+import { REFRESH_INTERVAL_MS, POLYMARKET_API_LIMIT, KALSHI_API_LIMIT, STALE_MARKET_THRESHOLD_MINUTES, REQUEST_TIMEOUT_MS } from "./constants";
+
+// Helper to create a fetch with timeout
+function fetchWithTimeout(url: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  return fetch(url, { signal: controller.signal })
+    .finally(() => clearTimeout(timeoutId));
+}
 
 // Helper to safely parse numeric values (preserves negatives for potential delta values)
 function safeParseNumber(value: any): number {
@@ -27,7 +36,7 @@ function safeParseDate(value: any): Date | null {
 // Helper to fetch Polymarket data
 export async function fetchPolymarket(): Promise<InsertMarket[]> {
   try {
-    const response = await fetch(`https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${POLYMARKET_API_LIMIT}`);
+    const response = await fetchWithTimeout(`https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${POLYMARKET_API_LIMIT}`);
     if (!response.ok) {
       console.error(`Polymarket API error: ${response.status} ${response.statusText}`);
       return [];
@@ -62,7 +71,7 @@ export async function fetchPolymarket(): Promise<InsertMarket[]> {
 // Helper to fetch Kalshi data
 export async function fetchKalshi(): Promise<InsertMarket[]> {
   try {
-    const response = await fetch(`https://api.elections.kalshi.com/trade-api/v2/markets?limit=${KALSHI_API_LIMIT}&status=open`);
+    const response = await fetchWithTimeout(`https://api.elections.kalshi.com/trade-api/v2/markets?limit=${KALSHI_API_LIMIT}&status=open`);
     if (!response.ok) {
       console.error(`Kalshi API error: ${response.status} ${response.statusText}`);
       return [];

@@ -32,6 +32,7 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` contains the markets table definition
 - **Key Fields**: externalId (unique), platform, question, url, totalVolume, volume24h, dates
 - **Upsert Strategy**: Uses `onConflictDoUpdate` on externalId for efficient market updates
+- **Indexes**: Optimized queries with indexes on `endDate`, `totalVolume`, and `lastUpdated` columns
 
 ### Build System
 - **Development**: `tsx` for running TypeScript directly
