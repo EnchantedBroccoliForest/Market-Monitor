@@ -40,7 +40,8 @@ export class DatabaseStorage implements IStorage {
             volume24h: sql`EXCLUDED.volume_24h`,
             lastUpdated: new Date(),
             question: sql`EXCLUDED.question`,
-            endDate: sql`EXCLUDED.end_date`
+            endDate: sql`EXCLUDED.end_date`,
+            url: sql`EXCLUDED.url`
           }
         });
     }

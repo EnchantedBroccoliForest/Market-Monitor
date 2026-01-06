@@ -51,17 +51,24 @@ export async function fetchPolymarket(): Promise<InsertMarket[]> {
     return data
       .filter((m: any) => m.active && !m.closed)
       .filter((m: any) => m.id || m.ticker)
-      .map((m: any): InsertMarket => ({
-        externalId: m.id || m.ticker,
-        platform: 'polymarket',
-        question: (m.question || m.title || "Untitled Market").trim().slice(0, 500),
-        url: m.slug ? `https://polymarket.com/event/${m.slug}` : "https://polymarket.com",
-        totalVolume: safeParseNumber(m.volume).toString(),
-        volume24h: safeParseNumber(m.volume24hr || m.volume_24h || m['24hr_volume']).toString(),
-        startDate: safeParseDate(m.startDate),
-        endDate: safeParseDate(m.endDate),
-        resolutionRules: (m.description || "").slice(0, 2000),
-      }));
+      .map((m: any): InsertMarket => {
+        // Use event slug for URL since individual market slugs don't resolve to pages
+        // The events array contains the parent event's slug which is the actual URL
+        const eventSlug = m.events?.[0]?.slug;
+        const urlSlug = eventSlug || m.slug;
+        
+        return {
+          externalId: m.id || m.ticker,
+          platform: 'polymarket',
+          question: (m.question || m.title || "Untitled Market").trim().slice(0, 500),
+          url: urlSlug ? `https://polymarket.com/event/${urlSlug}` : "https://polymarket.com",
+          totalVolume: safeParseNumber(m.volume).toString(),
+          volume24h: safeParseNumber(m.volume24hr || m.volume_24h || m['24hr_volume']).toString(),
+          startDate: safeParseDate(m.startDate),
+          endDate: safeParseDate(m.endDate),
+          resolutionRules: (m.description || "").slice(0, 2000),
+        };
+      });
   } catch (error) {
     console.error("Error fetching Polymarket:", error);
     return [];
