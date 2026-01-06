@@ -24,18 +24,26 @@ export class DatabaseStorage implements IStorage {
   async upsertMarkets(marketsList: InsertMarket[]): Promise<void> {
     if (marketsList.length === 0) return;
 
-    await db.insert(markets)
-      .values(marketsList)
-      .onConflictDoUpdate({
-        target: markets.externalId,
-        set: {
-          totalVolume: sql`EXCLUDED.total_volume`,
-          volume24h: sql`EXCLUDED.volume_24h`,
-          lastUpdated: new Date(),
-          question: sql`EXCLUDED.question`,
-          endDate: sql`EXCLUDED.end_date`
-        }
-      });
+    // Split into chunks to avoid PostgreSQL parameter limit (max 65535 params)
+    // 1000 rows * ~10 columns = ~10,000 params, which is safe.
+    const CHUNK_SIZE = 1000;
+    
+    for (let i = 0; i < marketsList.length; i += CHUNK_SIZE) {
+      const chunk = marketsList.slice(i, i + CHUNK_SIZE);
+      
+      await db.insert(markets)
+        .values(chunk)
+        .onConflictDoUpdate({
+          target: markets.externalId,
+          set: {
+            totalVolume: sql`EXCLUDED.total_volume`,
+            volume24h: sql`EXCLUDED.volume_24h`,
+            lastUpdated: new Date(),
+            question: sql`EXCLUDED.question`,
+            endDate: sql`EXCLUDED.end_date`
+          }
+        });
+    }
   }
 
   async deleteOldMarkets(days: number): Promise<void> {
