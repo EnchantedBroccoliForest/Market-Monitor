@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useMarkets, formatCurrency } from "@/hooks/use-markets";
 import { StatsCard } from "@/components/StatsCard";
 import { VolumeChart } from "@/components/VolumeChart";
@@ -27,9 +27,13 @@ export default function Home() {
   const [sortColumn, setSortColumn] = useState<SortColumn>("totalVolume");
 
   // Derived Statistics
-  const totalVolume = markets.reduce((acc, m) => acc + parseFloat(m.totalVolume || "0"), 0);
-  const volume24h = markets.reduce((acc, m) => acc + parseFloat(m.volume24h || "0"), 0);
-  const activeMarkets = markets.length;
+  const { totalVolume, volume24h, activeMarkets } = useMemo(() => {
+    return {
+      totalVolume: markets.reduce((acc, m) => acc + parseFloat(m.totalVolume || "0"), 0),
+      volume24h: markets.reduce((acc, m) => acc + parseFloat(m.volume24h || "0"), 0),
+      activeMarkets: markets.length
+    };
+  }, [markets]);
 
   // Handle column sort click - always descending (largest first)
   const handleSort = (column: SortColumn) => {
@@ -67,6 +71,34 @@ export default function Home() {
       }
     });
   }, [markets, search, sortColumn]);
+
+  // Pagination / Lazy Loading
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, sortColumn]);
+
+  const visibleMarkets = useMemo(() => {
+    return filteredMarkets.slice(0, page * ITEMS_PER_PAGE);
+  }, [filteredMarkets, page]);
+
+  const hasMore = visibleMarkets.length < filteredMarkets.length;
+
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastElementRef = useCallback((node: HTMLTableRowElement | null) => {
+    if (isLoading) return;
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prev => prev + 1);
+      }
+    });
+    
+    if (node) observer.current.observe(node);
+  }, [isLoading, hasMore]);
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -226,52 +258,63 @@ export default function Home() {
                   </tr>
                 ) : (
                   <AnimatePresence>
-                    {filteredMarkets.map((market, idx) => (
-                      <motion.tr 
-                        key={market.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2, delay: idx * 0.03 }}
-                        className="group hover:bg-white/[0.02] transition-colors"
-                      >
-                        <td className="p-4 text-center font-mono text-muted-foreground text-sm">
-                          {idx + 1}
+                    {visibleMarkets.map((market, idx) => {
+                      const isLast = idx === visibleMarkets.length - 1;
+                      return (
+                        <motion.tr 
+                          key={market.id}
+                          ref={isLast ? lastElementRef : undefined}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2, delay: (idx % ITEMS_PER_PAGE) * 0.03 }}
+                          className="group hover:bg-white/[0.02] transition-colors"
+                        >
+                          <td className="p-4 text-center font-mono text-muted-foreground text-sm">
+                            {idx + 1}
+                          </td>
+                          <td className="p-4">
+                            <PlatformBadge platform={market.platform} />
+                          </td>
+                          <td className="p-4">
+                            <a 
+                              href={market.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="font-medium text-foreground hover:text-primary transition-colors line-clamp-2 md:line-clamp-1 group-hover:underline decoration-primary/50 underline-offset-4"
+                            >
+                              {market.question}
+                            </a>
+                          </td>
+                          <td className="p-4 text-right font-mono font-medium">
+                            {formatCurrency(market.totalVolume)}
+                          </td>
+                          <td className="p-4 text-right font-mono text-muted-foreground">
+                            {formatCurrency(Number(market.volume24h))}
+                          </td>
+                          <td className="p-4 text-right text-sm text-muted-foreground">
+                            {market.endDate ? format(new Date(market.endDate), "MMM d, yyyy") : "-"}
+                          </td>
+                          <td className="p-4 text-right">
+                            <a 
+                              href={market.url}
+                              target="_blank"
+                              rel="noopener noreferrer" 
+                              className="inline-flex p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                    {hasMore && (
+                       <tr className="animate-pulse">
+                        <td colSpan={7} className="p-4 text-center text-muted-foreground text-sm">
+                          Loading more markets...
                         </td>
-                        <td className="p-4">
-                          <PlatformBadge platform={market.platform} />
-                        </td>
-                        <td className="p-4">
-                          <a 
-                            href={market.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="font-medium text-foreground hover:text-primary transition-colors line-clamp-2 md:line-clamp-1 group-hover:underline decoration-primary/50 underline-offset-4"
-                          >
-                            {market.question}
-                          </a>
-                        </td>
-                        <td className="p-4 text-right font-mono font-medium">
-                          {formatCurrency(market.totalVolume)}
-                        </td>
-                        <td className="p-4 text-right font-mono text-muted-foreground">
-                          {formatCurrency(Number(market.volume24h))}
-                        </td>
-                        <td className="p-4 text-right text-sm text-muted-foreground">
-                          {market.endDate ? format(new Date(market.endDate), "MMM d, yyyy") : "-"}
-                        </td>
-                        <td className="p-4 text-right">
-                          <a 
-                            href={market.url}
-                            target="_blank"
-                            rel="noopener noreferrer" 
-                            className="inline-flex p-2 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </td>
-                      </motion.tr>
-                    ))}
+                      </tr>
+                    )}
                   </AnimatePresence>
                 )}
               </tbody>
